@@ -63,4 +63,4 @@ engine.update_camera(position, angleX=0, angleY=0, angleZ=0)
 <img alt="Preview" src="">
 
 ## License
-Apache 2.0 — See LICENSE for more details
+BSD 3-Clause "New" or "Revised" License. View LICENSE for more details
