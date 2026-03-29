@@ -88,7 +88,15 @@ int main() {
         cam_z += .1f;
         point_t cam_pos = create_point(cam_x, cam_y, cam_z);
         engine.updateCamera(cam_pos, yaw, 0, 0);
+        auto t1 = std::chrono::high_resolution_clock::now();
+
         engine.update();
+
+        auto t2 = std::chrono::high_resolution_clock::now();
+        float ms = std::chrono::duration<float, std::milli>(t2 - t1).count();
+
+        char fpsLabel[64];
+        sprintf_s(fpsLabel, "Frame %d | %.1fms | %.0ffps", frame, ms, 1000.0f / ms);
 
         // wrap framebuffer in cv::Mat and display
         cv::Mat img(600, 800, CV_8UC4, engine.frame_buffer);
@@ -97,11 +105,11 @@ int main() {
         // burn frame number and cam_x onto the image so we can see it changing
         char label[64];
         sprintf_s(label, "Frame %d | cam_x=%.2f", frame, cam_x);
-        cv::putText(img, label, { 10, 30 }, cv::FONT_HERSHEY_SIMPLEX, 0.8, { 0, 255, 0 }, 2);
-
+        //cv::putText(img, label, { 10, 30 }, cv::FONT_HERSHEY_SIMPLEX, 0.8, { 0, 255, 0 }, 2);
+        cv::putText(img, fpsLabel, { 10, 30 }, cv::FONT_HERSHEY_SIMPLEX, 0.8, { 0, 255, 0 }, 2);
         cv::imshow("CRender Debug", img);
 
-        int key = cv::waitKey(100); // 100ms per frame so you can see each one
+        int key = cv::waitKey(1); // 100ms per frame so you can see each one
         if (key == 27) break; // ESC to exit early
     }
 

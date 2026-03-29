@@ -5,28 +5,30 @@
 #include <chrono>
 #include <array>
 #include "render.cuh"
+#include <cuda_runtime.h>
 //#include <opencv2/opencv.hpp>
 #include "pybind11/pybind11.h"
 namespace py = pybind11;
 
 void Engine::init(int screen_width, int screen_height) {
-	// If its unclear what the point of the fps is, the main purpose is to dictate how fast frames inside the buffer get added
-	this->isRunning = false; // Enable the Engine, have options to pause as well
-	
-	int sleep_ms = (int)(this->deltaTime * 1000);
-
+	this->isRunning = false;
 	this->screen_height = screen_height;
 	this->screen_width = screen_width;
 
-	this->frame_buffer = (uint32_t*)malloc(this->screen_height * this->screen_width * sizeof(uint32_t));
-	this->depth_buffer = (float*)malloc(this->screen_width * this->screen_height * sizeof(float));
+	cudaError_t err = cudaMallocHost(&this->frame_buffer, screen_width * screen_height * sizeof(uint32_t));
+	if (err != cudaSuccess) {
+		printf("cudaMallocHost failed: %s\n", cudaGetErrorString(err));
+		// fallback to regular malloc
+		this->frame_buffer = (uint32_t*)malloc(screen_width * screen_height * sizeof(uint32_t));
+	}
+	printf("frame_buffer = %p\n", this->frame_buffer);
 
+	this->depth_buffer = (float*)malloc(this->screen_width * this->screen_height * sizeof(float));
 	for (int i = 0; i < this->screen_width * this->screen_height; i++) {
 		this->depth_buffer[i] = FLT_MAX;
 	}
-
-
 }
+
 void Engine::start() {
 	gpu_init(this);
 }
@@ -124,5 +126,6 @@ void Engine::update_light(light_t light, point_t position, float intensity, std:
 }
 
 void Engine::cleanup() {
+	cudaFreeHost(this->frame_buffer);
 	gpu_free(this);
 }
