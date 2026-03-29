@@ -54,7 +54,7 @@ public:
 	/// </summary>
 	/// <param name="autoUpdate">Whether the engine should automatically update each frame</param>
 	/// <param name="fps">Target frames per second</param>
-	void init(bool autoUpdate, int fps);
+	void init();
 
 	/// <summary>
 	/// Updates all shapes and scene state for the current frame

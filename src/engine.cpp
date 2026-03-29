@@ -7,10 +7,7 @@
 #include "pybind11/pybind11.h"
 namespace py = pybind11;
 
-void Engine::init(bool autoUpdate, int fps) {
-
-	this->autoUpdate = autoUpdate;
-	this->deltaTime = 1.0 / (float)fps; // Conver the output value to a floating point for delta time
+void Engine::init() {
 	// If its unclear what the point of the fps is, the main purpose is to dictate how fast frames inside the buffer get added
 	this->isRunning = false; // Enable the Engine, have options to pause as well
 	
@@ -22,12 +19,6 @@ void Engine::init(bool autoUpdate, int fps) {
 	for (int i = 0; i < window_width * window_height; i++) {
 		this->depth_buffer[i] = FLT_MAX;
 	}
-
-	while (this->isRunning) {
-		std::this_thread::sleep_for(std::chrono::seconds(sleep_ms)); // maintain the framerate
-		this->update();
-	}
-
 }
 
 void Engine::render() {
@@ -122,6 +113,3 @@ void Engine::create_light(point_t position, float intensity, uint8_t* colourRGB)
 py::bytes Engine::get_framebuffer() {
 	return py::bytes((char*)this->frame_buffer, window_width * window_height * sizeof(uint32_t));
 }
-
-
-int main() { return 0; }

@@ -34,18 +34,34 @@ Scene/buffer management - tracks all your geometry buffers so you know what to d
 
 namespace py = pybind11;
 
+#include "spatial.h"
+
 PYBIND11_MODULE(crender, m) {
-	py::class_<Engine>(m, "Engine")
-		.def(py::init<>())
-		.def("init", &Engine::init)
-		.def("addShape", &Engine::addShape)
-		.def("removeShape", &Engine::removeShape)
-		.def("updateCamera", &Engine::updateCamera)
-		.def("get_framebuffer", &Engine::get_framebuffer);
+    m.doc() = "CRender - A lightweight 3D rendering library";
 
-	py::class_<Shape>(m, "Shape")
-		.def("moveShape", &Shape::moveShape)
-		.def("rotateShape", &Shape::rotateShape)
-		.def("scaleShape", &Shape::scaleShape);
+    py::class_<point_t>(m, "point_t", "A point in 3D space");
 
+    m.def("create_point", &create_point, py::arg("x"), py::arg("y"), py::arg("z"),
+        "Creates a point in 3D space");
+
+    py::class_<Engine>(m, "Engine", "Main rendering engine instance")
+        .def(py::init<>())
+        .def("init", &Engine::init, "Initialises the engine with autoupdate and fps settings")
+        .def("update", &Engine::update, "Updates and renders the current frame")
+        .def("addShape", &Engine::addShape, "Loads and adds a shape from an OBJ file")
+        .def("removeShape", &Engine::removeShape, "Removes a shape from the scene by index")
+        .def("updateCamera", &Engine::updateCamera, "Updates the camera position and angles")
+        .def("get_framebuffer", &Engine::get_framebuffer, "Returns the current framebuffer as bytes");
+
+    py::class_<Shape>(m, "Shape", "A 3D shape object")
+        .def("moveShape", &Shape::moveShape, "Moves the shape by an offset in each axis")
+        .def("rotateShape", &Shape::rotateShape, "Rotates the shape by angles in each axis")
+        .def("scaleShape", &Shape::scaleShape, "Scales the shape uniformly");
+}
+
+
+int main() {
+
+
+    return 0;
 }
