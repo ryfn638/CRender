@@ -3,54 +3,55 @@
 #include "buffer.h"
 #include <thread>
 #include <chrono>
+#include <array>
+#include "render.cuh"
 //#include <opencv2/opencv.hpp>
 #include "pybind11/pybind11.h"
 namespace py = pybind11;
 
-void Engine::init() {
+void Engine::init(int screen_width, int screen_height) {
 	// If its unclear what the point of the fps is, the main purpose is to dictate how fast frames inside the buffer get added
 	this->isRunning = false; // Enable the Engine, have options to pause as well
 	
 	int sleep_ms = (int)(this->deltaTime * 1000);
 
-	this->frame_buffer = (uint32_t*)malloc(window_height * window_width * sizeof(uint32_t));
-	this->depth_buffer = (float*)malloc(window_width * window_height * sizeof(float));
+	this->screen_height = screen_height;
+	this->screen_width = screen_width;
 
-	for (int i = 0; i < window_width * window_height; i++) {
+	this->frame_buffer = (uint32_t*)malloc(this->screen_height * this->screen_width * sizeof(uint32_t));
+	this->depth_buffer = (float*)malloc(this->screen_width * this->screen_height * sizeof(float));
+
+	for (int i = 0; i < this->screen_width * this->screen_height; i++) {
 		this->depth_buffer[i] = FLT_MAX;
 	}
+
+
 }
-
+void Engine::start() {
+	gpu_init(this);
+}
 void Engine::render() {
-	// clear buffers each frame
-	memset(this->frame_buffer, 0, window_width * window_height * sizeof(uint32_t));
-	for (int i = 0; i < window_width * window_height; i++) {
-		depth_buffer[i] = FLT_MAX;
-	}
+	gpu_render(this);
+	//memset(this->frame_buffer, 0, this->screen_width * this->screen_height * sizeof(uint32_t));
+	//std::fill(this->depth_buffer, this->depth_buffer + this->screen_width * this->screen_height, FLT_MAX);
 
-	for (int i = 0; i < this->shapeCount; i++) {
-		// get shape from arena
-		Shape* shape = (Shape*)this->allShapes[i].base;
-		if (shape == nullptr) {
-			printf("Shape is null at index %d\n", i);
-			continue;
-		}
+	//for (int i = 0; i < this->shapeCount; i++) {
+	//	// get shape from arena
+	//	Shape* shape = (Shape*)this->allShapes[i].base;
+	//	if (shape == nullptr) {
+	//		printf("Shape is null at index %d\n", i);
+	//		continue;
+	//	}
 
-		for (int f = 0; f < shape->face_count; f++) {
-			rasterize_face(
-				this,
-				shape->faces[f],
-				shape,
-				&this->camera,
-				90.0f,
-				(float)window_width / (float)window_height,
-				0.1f,
-				1000.0f,
-				window_width,
-				window_height
-			);
-		} 
-	}
+	//	mat4 mvp = build_mvp(shape, &this->camera,
+	//		90.0f * 3.1415/180,
+	//		(float)this->screen_width / (float)this->screen_height,
+	//		0.001f, 1000.0f);
+
+	//	for (int f = 0; f < shape->face_count; f++) {
+	//		rasterize_face(this, shape->faces[f], shape, mvp, screen_width, screen_height);
+	//	}
+	//}
 }
 
 void Engine::update() {
@@ -75,14 +76,16 @@ Shape* Engine::addShape(std::string filepath, point_t position, int width, int h
 	// get pointer from stored arena THEN load data into it
 	Shape* shape = (Shape*)this->allShapes[this->shapeCount - 1].base;
 	shape->initShape(position, width, height);
-	shape->loadShape(filepath);
+	shape->loadShape(filepath, this->lib);
+	shape->index = this->shapeCount - 1;
+
 	return shape;
 }
 
-void Engine::removeShape(int index) {
-	arena_free(&this->allShapes[index]);
+void Engine::removeShape(Shape* shape) {
+	arena_free(&this->allShapes[shape->index]);
 	// Free from memory then shift everything after by 1
-	for (int i = index; i < this->shapeCount - 1; i++) {
+	for (int i = shape->index; i < this->shapeCount - 1; i++) {
 		this->allShapes[i] = this->allShapes[i + 1];
 	}
 	this->shapeCount--;
@@ -97,7 +100,7 @@ void Engine::updateCamera(point_t position, float angleX, float angleY, float an
 	this->camera.angleZ = angleZ;
 }
 
-void Engine::create_light(point_t position, float intensity, uint8_t* colourRGB) {
+void Engine::create_light(point_t position, float intensity, std::array<uint8_t, 3> colourRGB) {
 
 	uint32_t colour = convert_colour(colourRGB);
 	light_t newLight;
@@ -111,5 +114,15 @@ void Engine::create_light(point_t position, float intensity, uint8_t* colourRGB)
 }
 
 py::bytes Engine::get_framebuffer() {
-	return py::bytes((char*)this->frame_buffer, window_width * window_height * sizeof(uint32_t));
+	return py::bytes((char*)this->frame_buffer, this->screen_width * this->screen_height * sizeof(uint32_t));
+}
+
+void Engine::update_light(light_t light, point_t position, float intensity, std::array<uint8_t, 3> colourRGB) {
+	light.colour = convert_colour(colourRGB);
+	light.position = position;
+	light.intensity = intensity;
+}
+
+void Engine::cleanup() {
+	gpu_free(this);
 }

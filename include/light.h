@@ -1,5 +1,5 @@
 #pragma once
-#include "spatial.h"
+#include <spatial.h>
 
 typedef struct {
     point_t position;

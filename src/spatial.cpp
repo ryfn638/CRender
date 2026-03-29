@@ -3,7 +3,7 @@
 #include <math.h>
 #include "engine.h"
 #include <iostream>
-
+#include "material.h"
 using namespace std;
 
 /* ----------------------------
@@ -88,6 +88,69 @@ matrix_t transform_vertex(vertex_t* vertex, Shape* shape, Camera* camera, float 
     return matrix_multiply(mvp, pos4);
 }
 
+// inline 4x4 multiply, no malloc
+mat4 mat4_multiply(const mat4& a, const mat4& b) {
+    mat4 out = {};
+    for (int r = 0; r < 4; r++)
+        for (int c = 0; c < 4; c++)
+            for (int k = 0; k < 4; k++)
+                out.v[r * 4 + c] += a.v[r * 4 + k] * b.v[k * 4 + c];
+    return out;
+}
+
+mat4 build_mvp(Shape* shape, Camera* camera, float fov, float aspect, float near_plane, float far_plane) {
+    mat4 model = {
+        1,0,0,shape->position.matrix.values[0],
+        0,1,0,shape->position.matrix.values[1],
+        0,0,1,shape->position.matrix.values[2],
+        0,0,0,1
+    };
+
+    float cx = cos(camera->angleX), sx = sin(camera->angleX);
+    float cy = cos(camera->angleY), sy = sin(camera->angleY);
+    float cz = cos(camera->angleZ), sz = sin(camera->angleZ);
+
+    float px = camera->position.matrix.values[0];
+    float py = camera->position.matrix.values[1];
+    float pz = camera->position.matrix.values[2];
+
+    // rotation first, then translate by -pos rotated into view space
+    mat4 view = {
+        cy * cz,              cy * sz,             -sy,    -(cy * cz * px + cy * sz * py + -sy * pz),
+        sx * sy * cz - cx * sz,     sx * sy * sz + cx * cz,    sx * cy, -((sx * sy * cz - cx * sz) * px + (sx * sy * sz + cx * cz) * py + sx * cy * pz),
+        cx * sy * cz + sx * sz,     cx * sy * sz - sx * cz,    cx * cy, -((cx * sy * cz + sx * sz) * px + (cx * sy * sz - sx * cz) * py + cx * cy * pz),
+        0,                  0,                  0,      1
+    };
+
+    float t = 1.0f / tan(fov / 2.0f);
+    float fn = far_plane + near_plane;
+    float fd = far_plane - near_plane;
+    mat4 proj = {
+        t / aspect, 0,  0,                    0,
+        0,        t,  0,                    0,
+        0,        0, -fn / fd,               -(2 * far_plane * near_plane) / fd,
+        0,        0, -1,                    0
+    };
+
+    return mat4_multiply(mat4_multiply(proj, view), model);
+}
+
+void project_vertex(vertex_t* vertex, const mat4& mvp, int width, int height, float& ox, float& oy, float& oz) {
+    float x = vertex->position.matrix.values[0];
+    float y = vertex->position.matrix.values[1];
+    float z = vertex->position.matrix.values[2];
+
+    float cx = mvp.v[0] * x + mvp.v[1] * y + mvp.v[2] * z + mvp.v[3];
+    float cy = mvp.v[4] * x + mvp.v[5] * y + mvp.v[6] * z + mvp.v[7];
+    float cz = mvp.v[8] * x + mvp.v[9] * y + mvp.v[10] * z + mvp.v[11];
+    float cw = mvp.v[12] * x + mvp.v[13] * y + mvp.v[14] * z + mvp.v[15];
+
+    float inv_w = 1.0f / cw;
+    ox = (cx * inv_w + 1.0f) * 0.5f * width;
+    oy = (1.0f - cy * inv_w) * 0.5f * height;
+    oz = cz * inv_w;
+}
+
 
 
 void Shape::moveShape(float moveX, float moveY, float moveZ) {
@@ -123,7 +186,7 @@ point_t create_point(float x, float y, float z) {
     return p;
 }
 
-void Shape::loadShape(std::string filepath) {
+void Shape::loadShape(std::string filepath, MTLLibrary* lib) {
     FILE* file;
     fopen_s(&file, filepath.c_str(), "r");
     if (!file) {
@@ -135,28 +198,46 @@ void Shape::loadShape(std::string filepath) {
     int vertex_count = 0, normal_count = 0, uv_count = 0, face_count = 0;
     char line[256];
     while (fgets(line, sizeof(line), file)) {
-        
         if (line[0] == 'v' && line[1] == ' ')  vertex_count++;
         else if (line[0] == 'v' && line[1] == 'n')  normal_count++;
         else if (line[0] == 'v' && line[1] == 't')  uv_count++;
         else if (line[0] == 'f' && line[1] == ' ')  face_count++;
     }
 
-    // allocate vertices, normals, uvs and faces
     this->vertices = (vertex_t*)malloc(vertex_count * sizeof(vertex_t));
     this->point_count = vertex_count;
 
     matrix_t* normals = (matrix_t*)malloc(normal_count * sizeof(matrix_t));
     float* us = (float*)malloc(uv_count * sizeof(float));
     float* vs = (float*)malloc(uv_count * sizeof(float));
-    this->faces = (face_t*)malloc(face_count * 2 * sizeof(face_t)); // *2 for quad splitting
+    this->faces = (face_t*)malloc(face_count * 2 * sizeof(face_t));
     this->face_count = 0;
 
     // second pass — read all data
     rewind(file);
     int vi = 0, ni = 0, uvi = 0;
+    int currentMaterialIndex = -1;  // -1 = no material assigned yet
+
     while (fgets(line, sizeof(line), file)) {
-        if (line[0] == 'v' && line[1] == ' ') {
+
+        // track current material
+        if (strncmp(line, "usemtl", 6) == 0) {
+            currentMaterialIndex = -1;
+
+            if (lib != nullptr) {
+                char matName[256];
+                sscanf_s(line, "usemtl %s", matName, (unsigned)sizeof(matName));
+                matName[strcspn(matName, "\r\n")] = '\0';
+
+                for (int i = 0; i < lib->count; i++) {
+                    if (lib->materials[i].name == matName) {
+                        currentMaterialIndex = i;
+                        break;
+                    }
+                }
+            }
+        }
+        else if (line[0] == 'v' && line[1] == ' ') {
             float x, y, z;
             sscanf_s(line, "v %f %f %f", &x, &y, &z);
             this->vertices[vi].position.matrix = create_matrix(1, 3);
@@ -184,49 +265,56 @@ void Shape::loadShape(std::string filepath) {
             uvi++;
         }
         else if (line[0] == 'f' && line[1] == ' ') {
-            int v0, v1, v2, v3 = -1;
-            int n0, n1, n2, n3 = -1;
-            int t0, t1, t2, t3 = -1;
+            // parse all vertices in the face generically
+            int vIdx[8], nIdx[8], tIdx[8];
+            int vertCount = 0;
 
-            // try quad first then triangle
-            int matches = sscanf_s(line, "f %d//%d %d//%d %d//%d %d//%d",
-                &v0, &n0, &v1, &n1, &v2, &n2, &v3, &n3);
+            // fill with -1
+            memset(vIdx, -1, sizeof(vIdx));
+            memset(nIdx, -1, sizeof(nIdx));
+            memset(tIdx, -1, sizeof(tIdx));
 
-            if (matches < 6) {
-                sscanf_s(line, "f %d/%d/%d %d/%d/%d %d/%d/%d %d/%d/%d",
-                    &v0, &t0, &n0, &v1, &t1, &n1, &v2, &t2, &n2, &v3, &t3, &n3);
+            const char* ptr = line + 2; // skip "f "
+            while (*ptr && *ptr != '\n' && vertCount < 8) {
+                int v = -1, t = -1, n = -1;
+                if (sscanf_s(ptr, "%d//%d", &v, &n) == 2) {}
+                else if (sscanf_s(ptr, "%d/%d/%d", &v, &t, &n) == 3) {}
+                else if (sscanf_s(ptr, "%d/%d", &v, &t) == 2) {}
+                else if (sscanf_s(ptr, "%d", &v) == 1) {}
+
+                vIdx[vertCount] = v;
+                nIdx[vertCount] = n;
+                tIdx[vertCount] = t;
+                vertCount++;
+
+                // advance ptr to next space
+                while (*ptr && *ptr != ' ' && *ptr != '\n') ptr++;
+                while (*ptr == ' ') ptr++;
             }
 
-            // OBJ indices are 1-based so subtract 1
-            // assign normals to vertices
-            this->vertices[v0 - 1].normal.matrix = normals[n0 - 1];
-            this->vertices[v1 - 1].normal.matrix = normals[n1 - 1];
-            this->vertices[v2 - 1].normal.matrix = normals[n2 - 1];
-
-            // assign uvs if present
-            if (t0 != -1) {
-                this->vertices[v0 - 1].u = us[t0 - 1];
-                this->vertices[v0 - 1].v = vs[t0 - 1];
-                this->vertices[v1 - 1].u = us[t1 - 1];
-                this->vertices[v1 - 1].v = vs[t1 - 1];
-                this->vertices[v2 - 1].u = us[t2 - 1];
-                this->vertices[v2 - 1].v = vs[t2 - 1];
-            }
-
-            // first triangle
-            this->faces[this->face_count++] = { v0 - 1, v1 - 1, v2 - 1 };
-
-            // if quad split into second triangle
-            if (v3 != -1) {
-                this->vertices[v3 - 1].normal.matrix = normals[n3 - 1];
-                if (t3 != -1) {
-                    this->vertices[v3 - 1].u = us[t3 - 1];
-                    this->vertices[v3 - 1].v = vs[t3 - 1];
+            // assign normals and uvs to all verts
+            for (int i = 0; i < vertCount; i++) {
+                if (nIdx[i] > 0)
+                    this->vertices[vIdx[i] - 1].normal.matrix = normals[nIdx[i] - 1];
+                if (tIdx[i] > 0) {
+                    this->vertices[vIdx[i] - 1].u = us[tIdx[i] - 1];
+                    this->vertices[vIdx[i] - 1].v = vs[tIdx[i] - 1];
                 }
-                this->faces[this->face_count++] = { v0 - 1, v2 - 1, v3 - 1 };
+            }
+
+            // triangle fan from v0 — works for tri, quad, pentagon, etc.
+            #pragma omp parallel for schedule(dynamic, 64)
+            for (int i = 1; i < vertCount - 1; i++) {
+                this->faces[this->face_count++] = {
+                    vIdx[0] - 1,
+                    vIdx[i] - 1,
+                    vIdx[i + 1] - 1,
+                    currentMaterialIndex
+                };
             }
         }
     }
+
     free(normals);
     free(us);
     free(vs);
@@ -244,12 +332,11 @@ void Shape::initShape(point_t position, int width, int height) {
 
 // Conversion from rgb struct to uint32_t (more efficient)
 
-uint32_t convert_colour(uint8_t* rgba) {
-    uint32_t out_colour = 0x00000000;
-    for (int i = 0; i < 4; i++) {
-        uint32_t mask = (uint32_t)rgba[i];
-        out_colour |= mask << i * 8;
+uint32_t convert_colour(std::array<uint8_t, 3> rgb) {
+    uint32_t out_colour = 0xFF000000; // full alpha
+    for (int i = 0; i < 3; i++) {
+        uint32_t mask = (uint32_t)rgb[i];
+        out_colour |= mask << (i * 8);
     }
-
     return out_colour;
 }

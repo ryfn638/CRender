@@ -1,5 +1,16 @@
 from setuptools import setup
 from pybind11.setup_helpers import Pybind11Extension
+import subprocess
+import os
+
+# compile the .cu file separately with nvcc
+subprocess.run([
+    "nvcc", "-c", "src/render.cu",
+    "-o", "src/render.o",
+    "-I", "include",
+    "--compiler-options", "/MD",  # MSVC compat
+    "-O3"
+], check=True)
 
 ext = Pybind11Extension(
     "crender",
@@ -11,17 +22,12 @@ ext = Pybind11Extension(
         "src/math.cpp",
         "src/arena.cpp",
         "src/light.cpp",
-        "src/window.cpp",
+        "src/material.cpp",
     ],
     include_dirs=["include", "src"],
+    extra_objects=["src/render.o"],  # link compiled CUDA object
+    extra_link_args=["cudart.lib"],  # link CUDA runtime
+    library_dirs=[r"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.0\lib\x64"],
 )
 
-setup(
-    name="crender",
-    version="0.1.0",
-    description="A lightweight C++ 3D rendering library with Python bindings",
-    long_description=open("README.md").read(),
-    long_description_content_type="text/markdown",
-    ext_modules=[ext],
-    python_requires=">=3.8",
-)
+setup(name="crender", ext_modules=[ext])

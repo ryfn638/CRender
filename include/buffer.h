@@ -37,4 +37,4 @@ extern uint32_t* frame_buffer;
 /// <returns></returns>
 point_t vertex_to_screen(vertex_t* vertex, Shape* shape, Camera* camera, float fov, float aspect, float near, float far, int width, int height);
 
-void rasterize_face(Engine* engine, face_t face, Shape* shape, Camera* camera, float fov, float aspect, float near, float far, int width, int height);
+void rasterize_face(Engine* engine, face_t face, Shape* shape, const mat4& mvp, int width, int height);

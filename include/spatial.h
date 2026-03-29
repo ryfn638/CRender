@@ -2,7 +2,7 @@
 #include "matrix.h"
 #include "arena.h"
 #include <string>
-
+#include "material.h"
 
 
 // Technically dont need to but this makes things infinitely more readable
@@ -20,6 +20,7 @@ typedef struct {
 
 typedef struct {
 	int v0, v1, v2;
+	int materialIndex;
 } face_t;
 
 
@@ -62,6 +63,7 @@ point_t create_point(float x, float y, float z);
 /// </summary>
 class Shape {
 public:
+	int index;
 	point_t position; // centroid
 	int width;
 	int height;
@@ -70,7 +72,7 @@ public:
 	/// Loads a .obj file from a defined filepath
 	/// </summary>
 	/// <param name="filepath">Path to the obj file</param>
-	void loadShape(std::string filepath);
+	void loadShape(std::string filepath, MTLLibrary* lib);
 
 	void initShape(point_t position, int width, int height);
 
@@ -122,3 +124,10 @@ matrix_t transform_vertex(
 	float near_plane,
 	float far_plane
 );
+
+struct mat4 {
+	float v[16];
+};
+
+mat4 build_mvp(Shape* shape, Camera* camera, float fov, float aspect, float near_plane, float far_plane);
+void project_vertex(vertex_t* vertex, const mat4& mvp, int width, int height, float& ax, float& ay, float& az);

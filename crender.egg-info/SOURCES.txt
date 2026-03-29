@@ -10,6 +10,6 @@ src/arena.cpp
 src/buffer.cpp
 src/engine.cpp
 src/light.cpp
+src/material.cpp
 src/math.cpp
 src/spatial.cpp
-src/window.cpp
