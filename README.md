@@ -8,44 +8,43 @@ A customised 3D rendering library designed for quick 3D renders without the setu
 ```
 pip install crender
 ```
+---
+# Usage
 
-## Usage
+Note that this library is only currently compatible with NVIDIA GPUs as it uses CUDA for multithreaded rendering.
 
-To display outputs, you will need to use an external library such as opencv like so
+## Initialising
+
 ```python
-import numpy as np
-import cv2
+import crender
 
+engine = crender.Engine()
+engine.init(SCREEN_WIDTH, SCREEN_HEIGHT)
+
+## Only run this after adding all lights and whatnot, if you are adding shapes live, then run this after
+engine.start_sim()
+```
+
+## Viewing
+This library only exports framebuffers rather than the whole simulation, because im a bit too lazy to do it myself. The frames are in BGRA format, so you can use pygame or open-cv for rendering on the plane
+
+```python
+import pygame
+import crender
+
+engine.update()
 buf = engine.get_framebuffer()
-frame = np.frombuffer(buf, dtype=np.uint8).reshape(height, width, 4)
-cv2.imshow("Renderer", frame)
-```
-
-To have the display auto update, simply set `autoupdate` to true and define the desired framerate:
-```python
-from crender import Engine
-
-engine = Engine()
-engine.init(autoupdate=True, fps=60)
-```
-
-For manual updates, set `autoupdate` to false and call `update()` yourself:
-```python
-engine = Engine()
-engine.init(autoupdate=False, fps=60)  # fps is negligible when autoupdate is False
-
-while True:
-    engine.update()
+screen.fill((0, 0, 0))
+surface = pygame.image.frombuffer(buf, (SCREEN_WIDTH, SCREEN_HEIGHT), "BGRA")
+screen.blit(surface, (0, 0))
+pygame.display.flip()
 ```
 
 ## Adding Shapes
 
 Load a shape from an OBJ file and position it in the scene:
 ```python
-from crender import Engine, create_point
-
-engine = Engine()
-sofa = engine.add_shape("sofa.obj", create_point(0, 0, 0), width=1, height=1)
+sofa = engine.add_shape("sofa.obj", crender.create_point(0, 0, 0), width=1, height=1) # currently empty params
 sofa.move_shape(10, 0, 0)
 ```
 
@@ -60,7 +59,7 @@ engine.update_camera(position, angleX=0, angleY=0, angleZ=0)
 ```
 
 ## Preview
-<img alt="Preview" src="">
+<img alt="Preview" src="pics/preview.png">
 
 ## License
 BSD 3-Clause "New" or "Revised" License. View LICENSE for more details

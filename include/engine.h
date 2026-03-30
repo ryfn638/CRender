@@ -3,7 +3,7 @@
 #include "arena.h"
 #include <string>
 #include "light.h"
-#include "pybind11/pybind11.h"
+#include <pybind11/pybind11.h>
 #include "material.h"
 #include "render.cuh"
 

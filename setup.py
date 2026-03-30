@@ -1,16 +1,29 @@
+import os
+import subprocess
 from setuptools import setup
 from pybind11.setup_helpers import Pybind11Extension
-import subprocess
-import os
+import pybind11
+import sysconfig
+CUDA_PATH = os.environ.get("CUDA_PATH", r"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.0")
 
-# compile the .cu file separately with nvcc
+nvcc = os.path.join(CUDA_PATH, "bin", "nvcc.exe")
+python_include = sysconfig.get_paths()["include"]
+cuda_include = os.path.join(CUDA_PATH, "include")
+
 subprocess.run([
-    "nvcc", "-c", "src/render.cu",
-    "-o", "src/render.o",
+    nvcc,
+    "-c", "src/render.cu",
+    "-o", "src/render.obj",
     "-I", "include",
-    "--compiler-options", "/MD",  # MSVC compat
+    "-I", pybind11.get_include(),
+    "-I", python_include,
+    "-I", cuda_include,
+    "-Xcompiler", "/MD",
     "-O3"
 ], check=True)
+
+
+
 
 ext = Pybind11Extension(
     "crender",
@@ -24,10 +37,20 @@ ext = Pybind11Extension(
         "src/light.cpp",
         "src/material.cpp",
     ],
-    include_dirs=["include", "src"],
-    extra_objects=["src/render.o"],  # link compiled CUDA object
-    extra_link_args=["cudart.lib"],  # link CUDA runtime
-    library_dirs=[r"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.0\lib\x64"],
+    include_dirs=[
+        "include",
+        "src",
+        pybind11.get_include(),
+        python_include,  # required for Python.h
+        cuda_include,
+    ],
+    extra_objects=["src/render.obj"],
+    library_dirs=[os.path.join(CUDA_PATH, "lib", "x64")],
+    libraries=["cudart"],
 )
 
-setup(name="crender", ext_modules=[ext])
+setup(
+    name="crender",
+    version="1.0.0",
+    ext_modules=[ext],
+)

@@ -55,7 +55,8 @@ PYBIND11_MODULE(crender, m) {
         .def("updateCamera", &Engine::updateCamera, "Updates the camera position and angles")
         .def("get_framebuffer", &Engine::get_framebuffer, "Returns the current framebuffer as bytes")
         .def("create_light", &Engine::create_light, "Creates a light point object")
-        .def("load_material", &Engine::loadMTL, "Loads a a mtl file into Material Library");
+        .def("load_material", &Engine::loadMTL, "Loads a a mtl file into Material Library")
+        .def("start_sim", &Engine::start, "Starts the simulation");
 
     py::class_<Shape>(m, "Shape", "A 3D shape object")
         .def("moveShape", &Shape::moveShape, "Moves the shape by an offset in each axis")
@@ -63,57 +64,60 @@ PYBIND11_MODULE(crender, m) {
         .def("scaleShape", &Shape::scaleShape, "Scales the shape uniformly");
 }
 
-#include "engine.h"
-#include "spatial.h"
-#include <stdio.h>
-#include <math.h>
-#include <opencv2/opencv.hpp>
-
 int main() {
-    Engine engine;
-    engine.init(800, 600);
-
-    point_t pos = create_point(0, 0, 0);
-    engine.loadMTL("InteriorTest.mtl");
-    engine.addShape("InteriorTest.obj", pos, 1, 1);
-
-    point_t light_pos = create_point(0, 1, 3);
-    engine.create_light(light_pos, 0.9f, { 255, 255, 255 });
-
-    float cam_x = 0, cam_y = 1, cam_z = 3;
-    float yaw = 0.45f;
-
-    engine.start();
-    for (int frame = 0; frame < 60; frame++) {
-        cam_z += .001f;
-        point_t cam_pos = create_point(cam_x, cam_y, cam_z);
-        engine.updateCamera(cam_pos, yaw, 0, 0);
-        auto t1 = std::chrono::high_resolution_clock::now();
-
-        engine.update();
-
-        auto t2 = std::chrono::high_resolution_clock::now();
-        float ms = std::chrono::duration<float, std::milli>(t2 - t1).count();
-
-        char fpsLabel[64];
-        sprintf_s(fpsLabel, "Frame %d | %.1fms | %.0ffps", frame, ms, 1000.0f / ms);
-
-        // wrap framebuffer in cv::Mat and display
-        cv::Mat img(600, 800, CV_8UC4, engine.frame_buffer);
-        cv::cvtColor(img, img, cv::COLOR_BGRA2BGR);
-
-        // burn frame number and cam_x onto the image so we can see it changing
-        char label[64];
-        sprintf_s(label, "Frame %d | cam_x=%.2f", frame, cam_x);
-        //cv::putText(img, label, { 10, 30 }, cv::FONT_HERSHEY_SIMPLEX, 0.8, { 0, 255, 0 }, 2);
-        cv::putText(img, fpsLabel, { 10, 30 }, cv::FONT_HERSHEY_SIMPLEX, 0.8, { 0, 255, 0 }, 2);
-        cv::imshow("CRender Debug", img);
-
-        int key = cv::waitKey(1); // 100ms per frame so you can see each one
-        if (key == 27) break; // ESC to exit early
-    }
-
-    cv::waitKey(0);
-    cv::destroyAllWindows();
     return 0;
 }
+//#include "engine.h"
+//#include "spatial.h"
+//#include <stdio.h>
+//#include <math.h>
+//#include <opencv2/opencv.hpp>
+
+//int main() {
+//    Engine engine;
+//    engine.init(800, 600);
+//
+//    point_t pos = create_point(0, 0, 0);
+//    engine.loadMTL("InteriorTest.mtl");
+//    engine.addShape("InteriorTest.obj", pos, 1, 1);
+//
+//    point_t light_pos = create_point(0, 1, 3);
+//    engine.create_light(light_pos, 0.9f, { 255, 255, 255 });
+//
+//    float cam_x = 0, cam_y = 1, cam_z = 3;
+//    float yaw = 0.45f;
+//
+//    engine.start();
+//    for (int frame = 0; frame < 60; frame++) {
+//        cam_z += .001f;
+//        point_t cam_pos = create_point(cam_x, cam_y, cam_z);
+//        engine.updateCamera(cam_pos, yaw, 0, 0);
+//        auto t1 = std::chrono::high_resolution_clock::now();
+//
+//        engine.update();
+//
+//        auto t2 = std::chrono::high_resolution_clock::now();
+//        float ms = std::chrono::duration<float, std::milli>(t2 - t1).count();
+//
+//        char fpsLabel[64];
+//        sprintf_s(fpsLabel, "Frame %d | %.1fms | %.0ffps", frame, ms, 1000.0f / ms);
+//
+//        // wrap framebuffer in cv::Mat and display
+//        cv::Mat img(600, 800, CV_8UC4, engine.frame_buffer);
+//        cv::cvtColor(img, img, cv::COLOR_BGRA2BGR);
+//
+//        // burn frame number and cam_x onto the image so we can see it changing
+//        char label[64];
+//        sprintf_s(label, "Frame %d | cam_x=%.2f", frame, cam_x);
+//        //cv::putText(img, label, { 10, 30 }, cv::FONT_HERSHEY_SIMPLEX, 0.8, { 0, 255, 0 }, 2);
+//        cv::putText(img, fpsLabel, { 10, 30 }, cv::FONT_HERSHEY_SIMPLEX, 0.8, { 0, 255, 0 }, 2);
+//        cv::imshow("CRender Debug", img);
+//
+//        int key = cv::waitKey(1); // 100ms per frame so you can see each one
+//        if (key == 27) break; // ESC to exit early
+//    }
+//
+//    cv::waitKey(0);
+//    cv::destroyAllWindows();
+//    return 0;
+//}
