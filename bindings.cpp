@@ -85,7 +85,7 @@ int main() {
 
     engine.start();
     for (int frame = 0; frame < 60; frame++) {
-        cam_z += .1f;
+        cam_z += .001f;
         point_t cam_pos = create_point(cam_x, cam_y, cam_z);
         engine.updateCamera(cam_pos, yaw, 0, 0);
         auto t1 = std::chrono::high_resolution_clock::now();

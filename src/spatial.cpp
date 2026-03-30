@@ -185,7 +185,6 @@ point_t create_point(float x, float y, float z) {
     p.matrix.values[2] = z;
     return p;
 }
-
 void Shape::loadShape(std::string filepath, MTLLibrary* lib) {
     FILE* file;
     fopen_s(&file, filepath.c_str(), "r");
@@ -210,14 +209,14 @@ void Shape::loadShape(std::string filepath, MTLLibrary* lib) {
     matrix_t* normals = (matrix_t*)malloc(normal_count * sizeof(matrix_t));
     float* us = (float*)malloc(uv_count * sizeof(float));
     float* vs = (float*)malloc(uv_count * sizeof(float));
-    this->faces = (face_t*)malloc(face_count * 2 * sizeof(face_t));
+    this->faces = (face_t*)malloc(face_count * 8 * sizeof(face_t));
     this->face_count = 0;
 
     // second pass — read all data
     rewind(file);
     int vi = 0, ni = 0, uvi = 0;
     int currentMaterialIndex = -1;  // -1 = no material assigned yet
-
+    int maxVerts = 0;
     while (fgets(line, sizeof(line), file)) {
 
         // track current material
@@ -291,7 +290,7 @@ void Shape::loadShape(std::string filepath, MTLLibrary* lib) {
                 while (*ptr && *ptr != ' ' && *ptr != '\n') ptr++;
                 while (*ptr == ' ') ptr++;
             }
-
+            maxVerts = max(maxVerts, vertCount);
             // assign normals and uvs to all verts
             for (int i = 0; i < vertCount; i++) {
                 if (nIdx[i] > 0)
@@ -303,7 +302,6 @@ void Shape::loadShape(std::string filepath, MTLLibrary* lib) {
             }
 
             // triangle fan from v0 — works for tri, quad, pentagon, etc.
-            #pragma omp parallel for schedule(dynamic, 64)
             for (int i = 1; i < vertCount - 1; i++) {
                 this->faces[this->face_count++] = {
                     vIdx[0] - 1,
@@ -320,6 +318,7 @@ void Shape::loadShape(std::string filepath, MTLLibrary* lib) {
     free(vs);
     fclose(file);
 }
+
 
 void Shape::initShape(point_t position, int width, int height) {
     this->position = position;
