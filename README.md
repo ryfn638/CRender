@@ -1,6 +1,6 @@
-<h1 align="center"> CRender </h1>
+# <h1 align="center"> CRender </h1>
 
-A customised 3D rendering library designed for quick 3D renders without the setup pipeline required by OpenGL. Optimised for easy Python integration — in essence a 3-dimensional Pygame with more efficient shape drawing methods. Note that this does not open a window, you will have to use an extra library to do this, this is to allow more control over visuals, this will only output the frame data.
+A customised 3D rendering library designed for quick 3D renders without the setup pipeline required by OpenGL. Optimised for easy Python integration — in essence a 3-dimensional Pygame with more efficient shape drawing methods. Note that this does not open a window, you will have to use an extra library to do this, this is to allow more control on visuals, this will only output the frame data.
 
 > **Note:** This package is currently in early development and may not be stable.
 
@@ -44,8 +44,8 @@ pygame.display.flip()
 
 Load a shape from an OBJ file and position it in the scene:
 ```python
-sofa = engine.add_shape("sofa.obj", crender.create_point(0, 0, 0), width=1, height=1) # currently empty params
-sofa.move_shape(10, 0, 0)
+sofa = engine.addShape("sofa.obj", crender.create_point(0, 0, 0), width=1, height=1) # currently empty params
+sofa.moveShape(10, 0, 0)
 ```
 
 ## Camera
@@ -55,7 +55,7 @@ Update the camera position and angle:
 from crender import create_point
 
 position = create_point(1, 1, 1)
-engine.update_camera(position, angleX=0, angleY=0, angleZ=0)
+engine.updateCamera(position, angleX=0, angleY=0, angleZ=0)
 ```
 
 ## Preview
